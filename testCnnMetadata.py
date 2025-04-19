@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
 
 import torch
 import torch.nn as nn
