@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import os
+import seaborn as sns
 
 from PIL import Image
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix
 
 import torch
 import torch.nn as nn
@@ -75,6 +78,32 @@ class ResNetWithMetadata(nn.Module):
         output = self.classifier(combined)
         return output
 
+def evaluate_model(model, dataloader, device):
+    model.eval()
+    total = 0
+    correct = 0
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for images, metadata, labels in dataloader:
+            images = images.to(device)
+            metadata = metadata.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images, metadata)
+            _, predicted = torch.max(outputs, 1)
+
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    accuracy = 100 * correct / total
+    print(f"✅ Evaluation Accuracy: {accuracy:.2f}%")
+    return all_preds, all_labels
+
 def main():
     base_dir = 'archive'
     metadata = pd.read_csv(base_dir + '/HAM10000_metadata.csv')
@@ -107,27 +136,29 @@ def main():
 
     metadata['image_path'] = metadata['image_id'] + '.jpg'
     metadata['full_path'] = metadata['image_path'].apply(lambda x: os.path.join(image_lookup[x], x))
-
-    metadata['age'] = metadata['age'].fillna(metadata['age'].median())
-    df_encoded = pd.get_dummies(metadata[['age', 'sex', 'localization']])
     
     metadata['age'] = metadata['age'].fillna(metadata['age'].median())
     metadata['sex'] = metadata['sex'].fillna('unknown')
     metadata['localization'] = metadata['localization'].fillna('unknown')
-    meta_raw = metadata[['age', 'sex', 'localization']].copy()
-    meta_encoded = pd.get_dummies(meta_raw, columns=['sex', 'localization'])
-    scaler = StandardScaler()
-    meta_encoded['age'] = scaler.fit_transform(meta_encoded[['age']])
-    
-    meta_encoded = meta_encoded.set_index(metadata.index)
 
+    scaler = StandardScaler()
+    metadata['age'] = scaler.fit_transform(metadata[['age']])
+
+    # split first then we will break up the arrays into metadata for the model and metadata to facilitate the run
     train_df, temp_df = train_test_split(
-        meta_encoded, test_size=0.3, stratify=meta_encoded['target'], random_state=42
+        metadata, test_size=0.3, stratify=metadata['target'], random_state=42
     )
 
     val_df, test_df = train_test_split(
         temp_df, test_size=0.5, stratify=temp_df['target'], random_state=42
     )
+        
+    #meta_raw = metadata[['age', 'sex', 'localization']].copy()
+    #meta_encoded = pd.get_dummies(meta_raw, columns=['sex', 'localization'])
+
+    #meta_encoded = meta_encoded.set_index(metadata.index)
+
+
 
     train_transforms = transforms.Compose([
         transforms.RandomHorizontalFlip(),
@@ -145,9 +176,25 @@ def main():
     ])
 
     # Select metadata rows for each split and convert
-    train_meta = torch.tensor(meta_encoded.loc[train_df.index].to_numpy().astype(np.float32))
-    val_meta   = torch.tensor(meta_encoded.loc[val_df.index].to_numpy().astype(np.float32))
-    test_meta  = torch.tensor(meta_encoded.loc[test_df.index].to_numpy().astype(np.float32))
+    train_meta_encoded = train_df[['age', 'sex', 'localization']].copy()
+    train_encoded = pd.get_dummies(train_meta_encoded, columns=['sex', 'localization'])
+    train_meta = torch.tensor(train_encoded.loc[train_df.index].to_numpy().astype(np.float32))
+    
+    val_meta_encoded = val_df[['age', 'sex', 'localization']].copy()
+    val_encoded = pd.get_dummies(val_meta_encoded, columns=['sex', 'localization'])
+    for index, dumCol in enumerate(train_encoded.columns):
+        if dumCol not in val_encoded:
+            val_encoded.insert(loc=index, column=dumCol, value=False)
+            
+    val_meta   = torch.tensor(val_encoded.loc[val_df.index].to_numpy().astype(np.float32))
+    
+    test_meta_encoded = test_df[['age', 'sex', 'localization']].copy()
+    test_encoded = pd.get_dummies(test_meta_encoded, columns=['sex', 'localization'])
+    for index, dumCol in enumerate(train_encoded.columns):
+        if dumCol not in test_encoded:
+            test_encoded.insert(loc=index, column=dumCol, value=False)
+
+    test_meta  = torch.tensor(test_encoded.loc[test_df.index].to_numpy().astype(np.float32))
 
     train_dataset = HAMDataset(train_df, meta_array=train_meta, transform=train_transforms)
     val_dataset   = HAMDataset(val_df, meta_array=val_meta, transform=val_test_transforms)
@@ -167,7 +214,32 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     for images, metadata, labels in train_loader:
-        print(images)
+        images = images.to(device)
+        metadata = metadata.to(device)
+        labels = labels.to(device)
 
+        optimizer.zero_grad()
+        outputs = model(images, metadata)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+    # After training is done:
+    val_preds, val_labels = evaluate_model(model, val_loader, device)
+
+    # Or for test set
+    test_preds, test_labels = evaluate_model(model, test_loader, device)
+    
+    # Print classification report
+    print(classification_report(val_labels, val_preds, target_names=train_dataset.classes))
+
+    # Confusion matrix
+    cm = confusion_matrix(val_labels, val_preds)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', xticklabels=train_dataset.classes, yticklabels=train_dataset.classes, cmap='Blues')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
 
 main()
