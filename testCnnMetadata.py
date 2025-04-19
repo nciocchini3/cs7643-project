@@ -5,6 +5,7 @@ import os
 import seaborn as sns
 
 from PIL import Image
+from tqdm import tqdm
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -15,6 +16,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 import torch.optim as optim
+import torch.nn.functional as F
 
 from torchvision import models
 from torchvision import transforms
@@ -78,6 +80,32 @@ class ResNetWithMetadata(nn.Module):
         output = self.classifier(combined)
         return output
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=None, gamma=2.0, reduction='mean'):
+        """
+        Focal Loss for classification tasks.
+        Args:
+            alpha (tensor): class weights (shape: [num_classes])
+            gamma (float): focusing parameter
+            reduction (str): 'mean', 'sum', or 'none'
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none', weight=self.alpha)
+        pt = torch.exp(-ce_loss)
+        loss = (1 - pt) ** self.gamma * ce_loss
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
+
 def evaluate_model(model, dataloader, device):
     model.eval()
     total = 0
@@ -108,6 +136,7 @@ def main():
     base_dir = 'archive'
     metadata = pd.read_csv(base_dir + '/HAM10000_metadata.csv')
 
+    EPOCHS = 3
     IMG_SIZE = (224, 224)
     lr = 1e-4
 
@@ -209,20 +238,60 @@ def main():
 
     model = ResNetWithMetadata(num_metadata_features=num_metadata_features,
                             num_classes=num_classes).to(device)
+    
+    class_weights = torch.tensor([1.0, 5.39], dtype=torch.float32).to(device)
+    criterion = FocalLoss(alpha=class_weights, gamma=2).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    for images, metadata, labels in train_loader:
-        images = images.to(device)
-        metadata = metadata.to(device)
-        labels = labels.to(device)
+    for epoch in range(EPOCHS):
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        
+        loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}")
+        for images, metadata, labels in loop:
+            images = images.to(device)
+            metadata = metadata.to(device)
+            labels = labels.to(device)
 
-        optimizer.zero_grad()
-        outputs = model(images, metadata)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            outputs = model(images, metadata)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            loop.set_postfix(loss=loss.item(), acc=100 * correct / total)
+            
+        # 🎯 Training summary
+        train_loss = running_loss / len(train_loader)
+        train_acc = 100 * correct / total
+        print(f"✅ Training Loss: {train_loss:.4f} | Accuracy: {train_acc:.2f}%")
+
+        # 🧪 VALIDATION
+        val_preds, val_labels, val_probs = evaluate_model(model, val_loader, device)
+
+        f1 = f1_score(val_labels, val_preds)
+        auc = roc_auc_score(val_labels, val_probs)
+        cm = confusion_matrix(val_labels, val_preds)
+
+        print(f"📊 Validation F1 Score: {f1:.4f}")
+        print(f"📈 Validation AUC: {auc:.4f}")
+        print(f"🧾 Confusion Matrix:\n{cm}")
+
+        # 💾 Save best model by F1
+        if f1 > best_f1:
+            best_f1 = f1
+            torch.save(model.state_dict(), "models")
+            print(f"💾 Saved new best model with F1: {best_f1:.4f}")
+
 
     # After training is done:
     val_preds, val_labels = evaluate_model(model, val_loader, device)
