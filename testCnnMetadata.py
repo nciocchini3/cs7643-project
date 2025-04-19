@@ -112,6 +112,7 @@ def evaluate_model(model, dataloader, device):
     correct = 0
     all_preds = []
     all_labels = []
+    all_probs = []
 
     with torch.no_grad():
         for images, metadata, labels in dataloader:
@@ -120,17 +121,19 @@ def evaluate_model(model, dataloader, device):
             labels = labels.to(device)
 
             outputs = model(images, metadata)
-            _, predicted = torch.max(outputs, 1)
+            probs = torch.softmax(outputs, dim=1)
+            _, predicted = torch.max(probs, 1)
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
             all_preds.extend(predicted.cpu().numpy())
+            all_probs.extend(probs[:, 1].cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
     accuracy = 100 * correct / total
-    print(f"✅ Evaluation Accuracy: {accuracy:.2f}%")
-    return all_preds, all_labels
+    print(f"✅ Eval Accuracy: {accuracy:.2f}%")
+    return all_preds, all_labels, all_probs
 
 def main():
     base_dir = 'archive'
@@ -139,6 +142,7 @@ def main():
     EPOCHS = 3
     IMG_SIZE = (224, 224)
     lr = 1e-4
+    best_f1 = 0
 
     binary_map = {
         "nv": "benign",
@@ -289,7 +293,7 @@ def main():
         # 💾 Save best model by F1
         if f1 > best_f1:
             best_f1 = f1
-            torch.save(model.state_dict(), "models")
+            torch.save(model.state_dict(), "models/best_metadata_model.pt")
             print(f"💾 Saved new best model with F1: {best_f1:.4f}")
 
 
