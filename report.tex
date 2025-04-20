@@ -1,20 +1,63 @@
 \documentclass[10pt,twocolumn,letterpaper]{article}
 
+\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
 \begin{document}
     \title{Project Report : CS 7643}
 
     \maketitle
 
     \begin{abstract}
-        The ABSTRACT is to be in fully-justified italicized text, at the top
-        of the left-hand column, below the author and affiliation
-        information. Use the word ``Abstract'' as the title, in 12-point
-        Times, boldface type, centered relative to the column, initially
-        capitalized. The abstract is to be in 10-point, single-spaced type.
-        Leave two blank lines after the Abstract, then begin the main text.
-        Look at previous CVPR abstracts to get a feel for style and length. 
-        The abstract section should contain a brief summary of your work that
-        includes the problem statement, proposed solution and results.
+        Abstract
     \end{abstract}
+
+    \section{Introduction/Motivation}
+    The incidence of skin cancer in the U.S. is quite significant, more than 
+    9,500 people are diagnosed with skin cancer every day, making it the most 
+    common form of cancer in the country. It's estimated that one in five 
+    Americans will develop skin cancer by the age of 70. Notably, higher 
+    mortality rates are observed among men, non-Hispanic Whites, and those 
+    aged over 70 \cite{Authors1}. \\
+    \\
+    Although various deep learning approaches have been used for 
+    computer-based skin cancer detection in recent years. Most detection
+    algorithms use convuolution nerual networks (CNN) to
+    classify skin leasions.  To the best of our knowledge, few deep learning 
+    studies on skin cancer have integrated metadata such as age, sex or leasion locations; 
+    only one study has utilized the dataset incorporating the additional risk 
+    factor such as race (the Caucasian and xanthous races dataset) to include these 
+    meta-features \cite{Authors2, Authors3, Authors4}.\\
+    \\
+    In our research, we aim to incorporate these clinically investigated 
+    risk factors into an enhanced model scheme \cite{Authors5}. By applying CNN transfer 
+    learning to the classification task along with these additional risk 
+    factors, we seek to refine the existing model architecture. This approach will improve the differentiation of malignant and 
+    benign lesions, boost early detection of skin cancer, enhance diagnostic 
+    accuracy, and ultimately improve clinical outcomes. \\
+    \\
+    Improving accuracies and early detections would be important for doctors
+    patients, hospitals, and insurance companies.  Early detection can give the
+    patient a 99\% survival rate \cite{Authors6}.  This also means that early
+    detection results in less hospital stays, smaller operations, and less
+    expenditures by patients and insurance.  Having such tools also aids
+    doctors by giving them another tool to determine if a leasion is serious
+    or not.  Furthermore, better accuracies will not only catch potentially malignant
+    leasions but also determine if a leasion is begin and does not need to
+    be removed. \\
+    \\
+    This research will be utilizing the HAM10000 ("Human Against Machine 10000 images")
+    dataset and the ISIC 2024 dataset, both of which can be found on kaggle.com.  These datasets come with one to many images
+    of leasions that can be used for training machine learning models along with
+    metadata about the patient to accompany these images.  The metadata that accompanies
+    the images will be the primary focus of this research as this will add new features
+    in an attempt to increase accuracy. \\
+    
+    \section{Approach}
+    Our approach
+
+    {\small
+        \bibliographystyle{ieee_fullname}
+        \bibliography{report}
+    }
 
 \end{document}
