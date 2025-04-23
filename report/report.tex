@@ -1,5 +1,7 @@
 \documentclass[10pt,twocolumn,letterpaper]{article}
 
+\usepackage{graphicx} 
+
 \usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
 
 \begin{document}
@@ -53,7 +55,53 @@
     in an attempt to increase accuracy. \\
     
     \section{Approach}
-    Our approach
+    Background research identified several pretrained models that were shown to perform
+    well on the HAM10000 data set \cite{Authors7}.  That goal of this research is to incorporate patient
+    metadata with the models to see how it improved on the accuracy, thus, the ResNet101 model
+    that is in pytorch was selected.  The hypothesis is that adding additional data about the
+    patients age, sex, and leasion locations would increase the accuracies.  For example, if you
+    look at Figure~\ref{fig:agebox}, it can be seen that the risk for malignant increase with age.
+    The final fully connected layer that did classification was
+    changed to take in the metadata along with the results from the ResNet101 model. See \\
+    \begin{figure}[t]
+        \begin{center}
+           \includegraphics[width=0.8\linewidth]{plots/agebox.png}
+        \end{center}
+        \caption{Benign and malignant cases by age.}
+        \label{fig:agebox}
+    \end{figure}
+    A few problems came up at this point of the research.  First, many of the leasions
+    contained multiple images, at different zoom levels, slightly rotated, and at different angles.
+    The first iterations of our model we filtered out these images and choose only one images for
+    each leasion.  The worry was that the multiple images would bias add bias.  The next problem
+    with the data is that this is a very unbalanced dataset.  There are significantly more cases
+    of begin then malignant photos as shown in Figure~\ref{fig:distbysex}.  To deal with the
+    unbalanced dataset different loss functions were explored both cross-entropy and focal loss
+    functions. \\
+    \begin{figure}[t]
+        \begin{center}
+           \includegraphics[width=0.8\linewidth]{plots/distbysex.png}
+        \end{center}
+        \caption{Distribution of benign and malignant cases by sex.}
+        \label{fig:distbysex}
+    \end{figure}
+    Two models were created for this research.  In our background research most pretrained models had pretty similar
+    results and ResNet101 was selected to be our benchmark for comparison \cite{Authors7,Authors8,Authors9,Authors10,Authors11,Authors12}.
+    Next, the same model that was used as a benchmark was used again and implemented to incorporate
+    the additional parient metadata (age, sec, leasion location) as additional input features.  The Figure~\ref{fig:arch} below
+    shows the architecture of the model with the addition of patient metadata. Finally, we then attempted to apply a
+    second data set to our model to see how it performed in transfer learning. \\
+    \begin{figure}[t]
+        \begin{center}
+           \includegraphics[width=0.8\linewidth]{plots/arch.png}
+        \end{center}
+        \caption{Model architecture with patient metadata added.}
+        \label{fig:arch}
+    \end{figure}
+
+    \section{Approach}
+
+
 
     {\small
         \bibliographystyle{ieee_fullname}
